@@ -5,6 +5,7 @@
 *.tfstate
 *.tfstate.*
 *.tfbackup
+*.terraform.lock.hcl
 
 # Variable files (may contain secrets)
 *.tfvars
@@ -34,5 +35,3 @@ override.tf.json
 # OS files
 .DS_Store
 Thumbs.db
-
-.terraform.lock.hcls
