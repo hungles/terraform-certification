@@ -5,7 +5,10 @@
 *.tfstate
 *.tfstate.*
 *.tfbackup
-*.terraform.lock.hcl
+
+# Terraform lock files
+.terraform.lock.hcl
+**/.terraform.lock.hcl
 
 # Variable files (may contain secrets)
 *.tfvars
