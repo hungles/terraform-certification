@@ -219,4 +219,11 @@ jobs:
 
       - name: Terraform apply
         working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
-        run: terraform apply -auto-approve -input=false ${{ github.workspace }}/artifacts/tfplan
+        run: |
+          set -euo pipefail
+          var_file=$(find . -maxdepth 1 -type f \( -name '*.tfvars' -o -name '*.tfvars.json' \) | head -n 1)
+          if [[ -n "$var_file" ]]; then
+            terraform plan -input=false -no-color -var-file="$var_file" -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
+          else
+            terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
+          fi
