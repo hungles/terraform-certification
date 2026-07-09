@@ -23,13 +23,61 @@ concurrency:
 
 env:
   TF_VERSION: 1.8.5
-  TF_WORKING_DIR: dev/instances
   AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
 jobs:
+  detect-changed-tf:
+    name: Detect changed Terraform directory
+    runs-on: ubuntu-latest
+    outputs:
+      tf_working_dir: ${{ steps.detect.outputs.tf_working_dir }}
+      has_tf_changes: ${{ steps.detect.outputs.has_tf_changes }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed Terraform files
+        id: detect
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+            git fetch --no-tags --prune --depth=1 origin "$base_sha"
+            changed_files=$(git diff --name-only "$base_sha" "$head_sha" || true)
+          else
+            before="${{ github.event.before }}"
+            after="${{ github.sha }}"
+            if [[ -n "${before:-}" ]]; then
+              git fetch --no-tags --prune --depth=1 origin "$before"
+              changed_files=$(git diff --name-only "$before" "$after" || true)
+            else
+              changed_files=$(git diff --name-only HEAD^ HEAD || true)
+            fi
+          fi
+          echo "changed_files=$changed_files"
+          tf_dirs=$(printf '%s\n' "$changed_files" | grep -E '\.tf$' | xargs -n1 dirname | sort -u || true)
+          if [[ -z "$tf_dirs" ]]; then
+            echo "has_tf_changes=false" >> "$GITHUB_OUTPUT"
+            echo "tf_working_dir=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          selected_dir=$(printf '%s\n' "$tf_dirs" | head -n1)
+          echo "has_tf_changes=true" >> "$GITHUB_OUTPUT"
+          echo "tf_working_dir=$selected_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Show selected Terraform directory
+        if: steps.detect.outputs.has_tf_changes == 'true'
+        run: |
+          echo "Selected Terraform working directory: ${{ steps.detect.outputs.tf_working_dir }}"
+
   terraform-format:
     name: Terraform Format Check
     runs-on: ubuntu-latest
+    needs: detect-changed-tf
+    if: needs.detect-changed-tf.outputs.has_tf_changes == 'true'
 
     steps:
       - name: Checkout repository
@@ -41,12 +89,14 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Check formatting
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform fmt -check -recursive
 
   terraform-validate:
     name: Terraform Validate
     runs-on: ubuntu-latest
-    needs: terraform-format
+    needs: [detect-changed-tf, terraform-format]
+    if: needs.detect-changed-tf.outputs.has_tf_changes == 'true'
 
     steps:
       - name: Checkout repository
@@ -58,17 +108,18 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform init -backend=false -input=false
 
       - name: Terraform validate
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform validate
 
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    needs: terraform-validate
+    needs: [detect-changed-tf, terraform-validate]
+    if: needs.detect-changed-tf.outputs.has_tf_changes == 'true'
 
     steps:
       - name: Checkout repository
@@ -87,24 +138,24 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform init -input=false
 
       - name: Terraform plan
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out=tfplan
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          path: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}/tfplan
 
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    needs: terraform-plan
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: [detect-changed-tf, terraform-plan]
+    if: needs.detect-changed-tf.outputs.has_tf_changes == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     environment: production
 
     steps:
@@ -127,12 +178,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
-          path: ${{ env.TF_WORKING_DIR }}
+          path: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
 
       - name: Terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
         run: terraform init -input=false
 
       - name: Terraform apply
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform apply -auto-approve -input=false ${{ env.TF_WORKING_DIR }}/tfplan
+        working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
+        run: terraform apply -auto-approve -input=false ${{ needs.detect-changed-tf.outputs.tf_working_dir }}/tfplan
