@@ -54,6 +54,8 @@ jobs:
           else
             before="${{ github.event.before }}"
             after="${{ github.sha }}"
+            echo "before=$before"
+            echo "after=$after"
             if [[ -n "${before:-}" ]]; then
               git fetch --no-tags --prune --depth=1 origin "$before"
               changed_files=$(git diff --name-only "$before" "$after" || true)
