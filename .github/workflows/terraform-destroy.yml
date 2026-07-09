@@ -84,7 +84,8 @@ jobs:
               init_args+=( -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" )
             fi
             terraform -chdir="$dir" init "${init_args[@]}"
-
+            echo "directorio=$dir"
+            ls
             var_file=$(find . -maxdepth 1 -type f \( -name '*.tfvars' -o -name '*.tfvars.json' \) | head -n 1)
 
             pwd
