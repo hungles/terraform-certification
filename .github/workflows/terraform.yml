@@ -47,6 +47,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             base_sha="${{ github.event.pull_request.base.sha }}"
             head_sha="${{ github.event.pull_request.head.sha }}"
+            echo "base_sha=$base_sha"
+            echo "head_sha=$head_sha"
             git fetch --no-tags --prune --depth=1 origin "$base_sha"
             changed_files=$(git diff --name-only "$base_sha" "$head_sha" || true)
           else
