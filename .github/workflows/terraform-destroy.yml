@@ -91,6 +91,4 @@ jobs:
             else
                 terraform -chdir="$dir" destroy -auto-approve -input=false -var="aws_region=${AWS_REGION}"
             fi
-
-            terraform -chdir="$dir" destroy -auto-approve -input=false -var="aws_region=${AWS_REGION}"
           done
