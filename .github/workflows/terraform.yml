@@ -143,13 +143,13 @@ jobs:
 
       - name: Terraform plan
         working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
-        run: terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out=tfplan
+        run: terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}/tfplan
+          path: ${{ github.workspace }}/tfplan
 
   terraform-apply:
     name: Terraform Apply
@@ -178,7 +178,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
-          path: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
+          path: ${{ github.workspace }}/artifacts
 
       - name: Terraform init
         working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
@@ -186,4 +186,4 @@ jobs:
 
       - name: Terraform apply
         working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
-        run: terraform apply -auto-approve -input=false ${{ needs.detect-changed-tf.outputs.tf_working_dir }}/tfplan
+        run: terraform apply -auto-approve -input=false ${{ github.workspace }}/artifacts/tfplan
