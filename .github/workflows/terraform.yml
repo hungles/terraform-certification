@@ -147,6 +147,8 @@ jobs:
             echo "TF_STATE_BUCKET secret is required for remote state." >&2
             exit 1
           fi
+          var_file="dev-variables.tfvars"
+
           tf_key="${{ needs.detect-changed-tf.outputs.tf_working_dir }}/terraform.tfstate"
           init_args=( -reconfigure -input=false -backend-config="bucket=${TF_STATE_BUCKET}" -backend-config="key=${tf_key}" -backend-config="region=${AWS_REGION}" -backend-config="encrypt=true" )
           if [[ -n "${TF_STATE_LOCK_TABLE}" ]]; then
@@ -156,7 +158,14 @@ jobs:
 
       - name: Terraform plan
         working-directory: ${{ needs.detect-changed-tf.outputs.tf_working_dir }}
-        run: terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
+        run: |
+          set -euo pipefail
+          var_file=$(find . -maxdepth 1 -type f \( -name '*.tfvars' -o -name '*.tfvars.json' \) | head -n 1)
+          if [[ -n "$var_file" ]]; then
+            terraform plan -input=false -no-color -var-file="$var_file" -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
+          else
+            terraform plan -input=false -no-color -var="aws_region=${{ env.AWS_REGION }}" -out="${{ github.workspace }}/tfplan"
+          fi
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
