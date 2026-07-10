@@ -86,6 +86,7 @@ jobs:
             terraform -chdir="$dir" init "${init_args[@]}"
             echo "directorio=$dir"
             ls
+            cd "$dir"
             var_file=$(find . -maxdepth 1 -type f \( -name '*.tfvars' -o -name '*.tfvars.json' \) | head -n 1)
 
             pwd
