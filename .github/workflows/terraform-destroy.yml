@@ -88,12 +88,10 @@ jobs:
             ls
             cd "$dir"
             var_file=$(find . -maxdepth 1 -type f \( -name '*.tfvars' -o -name '*.tfvars.json' \) | head -n 1)
-
-            pwd
             echo "varfile=$var_file"
             if [[ -n "$var_file" ]]; then
-                terraform -chdir="$dir" destroy -auto-approve -input=false -var-file="$var_file" -var="aws_region=${AWS_REGION}"
+                terraform destroy -auto-approve -input=false -var-file="$var_file" -var="aws_region=${AWS_REGION}"
             else
-                terraform -chdir="$dir" destroy -auto-approve -input=false -var="aws_region=${AWS_REGION}"
+                terraform destroy -auto-approve -input=false -var="aws_region=${AWS_REGION}"
             fi
           done
