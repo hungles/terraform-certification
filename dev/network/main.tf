@@ -1,4 +1,4 @@
-module "vpc" {
+module "vpc-dev" {
   source = "../../modules/vpc"
 
   enable_nat_gateway  = var.enable_nat_gateway
@@ -12,4 +12,3 @@ module "vpc" {
   private_subnet_tags = var.private_subnet_tags
   public_subnet_tags  = var.public_subnet_tags
 }
-
